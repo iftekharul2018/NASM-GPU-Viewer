@@ -48,7 +48,7 @@ To compile and run this project, you will need the following installed and added
 
 
 
-Windows
+###Windows
 
 Open your terminal in the project directory and run:
 
