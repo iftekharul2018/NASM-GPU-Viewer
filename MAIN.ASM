@@ -7,11 +7,23 @@ default rel
     %define arg2 rdx
     %define arg3 r8
     %define arg4 r9
+    %macro set_arg5 1
+        mov qword [rsp+32], %1
+    %endmacro
+    %macro set_arg6 1
+        mov qword [rsp+40], %1
+    %endmacro
 %else ; LINUX
     %define arg1 rdi
     %define arg2 rsi
     %define arg3 rdx
     %define arg4 rcx
+    %macro set_arg5 1
+        mov r8, %1
+    %endmacro
+    %macro set_arg6 1
+        mov r9, %1
+    %endmacro
 %endif
 
 segment .data
@@ -29,13 +41,14 @@ segment .data
     SDL_WINDOW_BORDERLESS  equ 0x00000010
     SDL_WINDOW_RESIZABLE   equ 0x00000020
     SDL_WINDOW_FULLSCREEN_DESKTOP equ 0x00001001 
-    SDL_RENDERER_ACCELERATED equ 0x00000002
+    SDL_RENDERER_ACCELERATED equ 0x00000002    
+    ;SDL_RENDERER_SOFTWARE equ 0x00000001
     SDL_RENDERER_PRESENTVSYNC equ 0x00000004
 
     ; Float Constants for Math
-    zoomFactorIn   dd 1.1
-    zoomFactorOut  dd 0.90909
-    floatTwo       dd 2.0
+    zoomFactorIn  dd 1.1
+    zoomFactorOut dd 0.90909
+    floatTwo      dd 2.0
 
 segment .bss
     align 16
@@ -81,7 +94,8 @@ segment .text
 main:
     push rbp
     mov rbp, rsp
-    sub rsp, 64
+    and rsp, -16      ; FORCE 16-byte alignment to prevent Linux segfaults
+    sub rsp, 64       ; Allocate local shadow space
 
     ; 1. Initialize SDL2
     mov arg1, SDL_INIT_VIDEO
@@ -96,18 +110,18 @@ main:
     mov arg2, SDL_WINDOWPOS_CENTERED
     mov arg3, SDL_WINDOWPOS_CENTERED
     mov arg4, 800           
-    mov qword [rsp+32], 600 
+    set_arg5 600           
     
     mov rax, SDL_WINDOW_BORDERLESS
     or rax, SDL_WINDOW_RESIZABLE
-    mov qword [rsp+40], rax 
+    set_arg6 rax           
     call SDL_CreateWindow
     mov [rel pWindow], rax
 
     ; 4. Create Renderer
     mov arg1, [rel pWindow]
     mov arg2, -1
-    mov arg3, SDL_RENDERER_ACCELERATED
+    mov arg3, SDL_RENDERER_ACCELERATED 
     or arg3, SDL_RENDERER_PRESENTVSYNC
     call SDL_CreateRenderer
     mov [rel pRenderer], rax
@@ -124,7 +138,7 @@ main:
     xor arg3, arg3       
     lea arg4, [rel origWidth]
     lea rax, [rel origHeight]
-    mov [rsp+32], rax    
+    set_arg5 rax           
     call SDL_QueryTexture
 
     ; 7. Setup initial dimensions and compute camera
@@ -195,7 +209,7 @@ main:
     xor arg3, arg3       
     lea arg4, [rel origWidth]
     lea rax, [rel origHeight]
-    mov [rsp+32], rax    
+    set_arg5 rax           
     call SDL_QueryTexture
 
     call reset_camera
@@ -376,7 +390,7 @@ main:
     mov arg2, 0
     mov arg3, 0
     mov arg4, 0
-    mov qword [rsp+32], 255
+    set_arg5 255
     call SDL_SetRenderDrawColor
 
     mov arg1, [rel pRenderer]
@@ -413,7 +427,7 @@ main:
     mov arg2, 50
     mov arg3, 255
     mov arg4, 50
-    mov qword [rsp+32], 255
+    set_arg5 255
     call SDL_SetRenderDrawColor
     mov dword [rel uiRect+0], 0   
     mov dword [rel uiRect+4], 0   
@@ -428,7 +442,7 @@ main:
     mov arg2, 255
     mov arg3, 255
     mov arg4, 0
-    mov qword [rsp+32], 255
+    set_arg5 255
     call SDL_SetRenderDrawColor
     mov dword [rel uiRect+0], 0 
     mov eax, dword [rel winH]
@@ -445,7 +459,7 @@ main:
     mov arg2, 0
     mov arg3, 120
     mov arg4, 255
-    mov qword [rsp+32], 255
+    set_arg5 255
     call SDL_SetRenderDrawColor
     mov eax, dword [rel winW]
     sub eax, 80
@@ -462,7 +476,7 @@ main:
     mov arg2, 255
     mov arg3, 50
     mov arg4, 50
-    mov qword [rsp+32], 255
+    set_arg5 255
     call SDL_SetRenderDrawColor
     mov eax, dword [rel winW]
     sub eax, 40
@@ -476,7 +490,7 @@ main:
     mov arg2, 100
     mov arg3, 100
     mov arg4, 100
-    mov qword [rsp+32], 255
+    set_arg5 255
     call SDL_SetRenderDrawColor
     mov eax, dword [rel winW]
     sub eax, 20
@@ -509,7 +523,6 @@ main:
     ret
 
 ; --- SUBROUTINE: RE-CENTER CAMERA ---
-; Placed OUTSIDE main so it doesn't break local label scope
 reset_camera:
     cvtsi2ss xmm0, dword [rel origWidth]
     cvtsi2ss xmm1, dword [rel origHeight]
